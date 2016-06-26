@@ -1,0 +1,1558 @@
+
+/******识别所操作节点的ID******/
+var VMID;       //虚拟机id，区分虚拟机
+var RTID;       //路由器
+var FWID;       //防火墙
+var SWID;       //交换机
+var LBID;       //负载均衡器
+/***用户生成网络拓扑所存数据***/
+var vmCluster = [];//
+var switchNetwork = [];
+var loadBanlancerName = [];
+var RouterName = [];
+var ClusterInfo = [];  //集群信息
+var LBInfo = []; //负载均衡器信息
+var VMInfo = [];
+var FWInfo = [];
+var RTInfo = [];
+var NETInfo = [];
+var ClusterNetworkInfo= [];
+var LBNetworkInfo = [];
+var RouterNetworkInfo = [];
+
+var TopoJson = {};   //整体拓扑JSON全部数据
+var ClusterJson = [];
+var NetworksJson = [];
+var RoutersJson = [];
+var LoadBalancersJson = [];
+var FireWallsJson = [];
+var KeyPairsJson = [];
+var ClusterNetworkJson = [];
+var FWrules = []; 
+var rulesRow = 0;
+
+var lbNetworkData = [];
+var ClusterNetworkData = [];
+var RouterNetworkData = [];
+/***从服务器获取网络状态信息保存的数据**/
+var serversInfo = [];
+var portsInfo = [];
+var networksInfo = [];
+var routerInfo = [];
+/******服务器获取信息的对应数据*****/
+var VmLink = [];
+var switchLink = [];
+var lbLink = [];
+var routerLink = [];
+
+var parseData;
+var ClusterCounter = 0;
+/**********计费相关存储************/
+var clusterSpec = [];
+var clusterPrice = 0;
+var currentClusterPrice;
+var instancePrice_array = [];
+
+var physicalTopo;
+var switch_id = [];
+var autoHostList = [];
+var autoSwitchList = [];
+var switchRoutes = [];
+var switch_vSwitch_ports = [];
+var vSwitchLinks = [];
+var phyLink = [];
+var x_loc;
+var y_loc;
+var shc_connections;
+var switch_host_cpu = [];
+var butId;
+
+
+
+
+function init_switch_host_cpu(){
+	switch_host_cpu.length = 0;
+	for(var i = 0;i<=10;i++)
+        {
+	var s_h_c = {
+		"swid":"Switch"+i,
+		"hostCount":0,
+		"cpuUtil":100
+	}
+	switch_host_cpu.push(s_h_c);
+        }
+	console.log(switch_host_cpu);
+}
+function getData(){
+	xmlhttp = new XMLHttpRequest();
+    xmlhttp.onreadystatechange = function(){
+    if(xmlhttp.readystate == 4)
+        {
+           if(xmlhttp.status==200 )
+                {
+                    console.log(xmlhttp.responseText);
+                }
+                else
+                {
+                    console.log("Request was unsuccessful: "+ xmlhttp.status);
+                }
+       }
+    }
+	xmlhttp.open("GET","physicaljson",false);
+	xmlhttp.send();
+	return xmlhttp.responseText;
+}
+
+function postData(obj,url){
+	payload = obj;
+	xmlhttp = new XMLHttpRequest();
+    xmlhttp.onreadystatechange = function()
+   {
+          if (xmlhttp.readyState == 4){
+				if((xmlhttp.status >= 200 &&xmlhttp.status < 300)||xmlhttp.status == 304){
+					alert(xmlhttp.responseText);
+                }
+                else {
+                    alert("Request was unsuccessful: "+ xmlhttp.status);
+                }
+          }
+   };
+	xmlhttp.open("POST",url,true);
+        //xmlhttp.setRequestHeader("Content-Type","application/x-www-form-urlencoded;");
+        xmlhttp.setRequestHeader("X-CSRFToken",getCookie('csrftoken'));
+	xmlhttp.send(payload);
+    return xmlhttp.responseText;
+}
+
+
+function getCookie(name){
+	var cookieValue = null;
+	if (document.cookie && document.cookie != ''){
+		var cookies = document.cookie.split(';');
+		for ( var i in cookies){
+			var cookie = jQuery.trim(cookies[i]);
+			if (cookie.substring(0,name.length+1) == (name+'=')){
+				cookieValue = decodeURIComponent(cookie.substring(name.length+1));
+				break;
+			}
+		}
+	}
+	return cookieValue;
+}
+var localjson = {};
+
+
+
+
+
+
+/***
+ ***数组去重***
+ ***/
+function uniqueArray(data){  
+data = data || [];  
+var a = {};  
+for (var i=0; i<data.length; i++) {  
+var v = data[i];  
+if (typeof(a[v]) == 'undefined'){  
+    a[v] = 1;  
+}  
+};  
+data.length=0;  
+for (var i in a){  
+data[data.length] = i;  
+}  
+return data;  
+}  
+/***
+***生成拓扑结构的json格式
+***/
+function generateLocalTopology(){
+	var connectionList = jsPlumb.getConnections();
+	var connections = [];
+	var vmDevice = [];
+
+	for (var index in connectionList)
+{
+	   
+		connections.push(
+			{
+				"source":connectionList[index].sourceId,
+				"target":connectionList[index].targetId,
+				//"cidr": connectionList[index].getLabel()
+			}
+		);
+}
+for(var index in connections)
+{
+vmDevice.push(connections[index].source);
+vmDevice.push(connections[index].target);
+}
+var vmDevices = uniqueArray(vmDevice);
+localjson.vmDevice = vmDevices;
+localjson.connections = connections;
+//console.log(connections);
+//console.log(vmCluster);
+/**
+for(var index in connections)
+{
+   var tempSource = connections[index].source;
+   var tempTarget = connections[index].target;
+    var networksList = [];
+    var cc;
+   //switch
+   if(tempSource[0]=="S")
+   {
+        var networkData ;
+        for(var j in switchNetwork)
+        {
+          if(tempSource==switchNetwork[j].switchId)
+          {
+            networkData = switchNetwork[j].NetworkName;
+       //   console.log(networkData);
+          }
+        }
+        //switch -------vm
+        if(tempTarget[0]=="V")
+        {
+             for(var i =0;i< vmCluster.length;i++)
+             {
+                 if(tempTarget==vmCluster[i].instanceId)
+                  {
+                    cc = parseInt(vmCluster[i].ClusterIndexID);
+                      vmCluster[i].networks.push(networkData);
+ 
+                 
+                  }
+             }
+        }
+
+        //switch-------router
+        if(tempTarget[0]=="R")
+        {
+               for(var i in RouterNetworkInfo)
+               {
+                if (tempTarget == RouterNetworkInfo[i].RouterID)
+                {
+                  RouterNetworkInfo[i].networks.push(networkData);
+                }
+               }
+        }
+        //switch-------loadbalancer
+        if(tempTarget[0]=="L")
+        {
+                 for(var i in LBNetworkInfo)
+               {
+                if (tempTarget == LBNetworkInfo[i].loadbalanceID)
+                {
+                  LBNetworkInfo[i].networks=networkData;
+                }
+               }
+        }
+   }
+   //vm
+   if (tempSource[0]=="V") 
+    {
+      var tempVmID = tempSource;
+      //vm-----------switch
+      if(tempTarget[0]=="S")
+      {
+        var networkData;
+             for(var j in switchNetwork)
+             {
+                    if(switchNetwork[j].switchId == tempTarget)
+                    {
+                         networkData = switchNetwork[j].NetworkName;
+                    }
+             }
+             for(var j in vmCluster)
+             {
+               if (vmCluster[j].instanceId == tempVmID)
+               {
+                       vmCluster[j].networks.push(networkData);
+               }
+             }
+      }
+      //vm
+      if(tempTarget[0]=="")
+      {
+
+      }
+      //error
+      else{
+
+      }
+
+    }
+    //LB
+    if(tempSource[0]=="L")
+    {
+
+      //lb--------switch
+      if(tempTarget[0]=="S")
+      {
+               var networkData ;
+        for(var j in switchNetwork)
+        {
+          if(tempTarget==switchNetwork[j].switchId)
+          {
+            networkData = switchNetwork[j].NetworkName;
+       //   console.log(networkData);
+          }
+        }
+
+               for(var i in LBNetworkInfo)
+               {
+                if (tempSource == LBNetworkInfo[i].loadbalanceID)
+                {
+                  LBNetworkInfo[i].networks=networkData;
+                }
+               }
+      }
+      //lb--------router
+      if(tempTarget[0]=="R")
+      {
+
+      }
+      //error
+      else{
+
+      }
+    }
+    //Router
+    if(tempSource[0]=="R")
+    {
+      for(var k in RouterNetworkInfo)
+      {
+        if(tempSource == RouterNetworkInfo[k].RouterID)
+        {
+          var temprouterId = RouterNetworkInfo[k].RouterIndex;
+         }
+      }
+      //router----------firewall
+      if(tempTarget[0]=="F")
+      {
+
+      }
+      //router-----------lb
+      if(tempTarget[0]=="L")
+      {
+
+      }
+      //router------------switch
+      if(tempTarget[0]=="S")
+      {
+        var networkData ;
+        for(var j in switchNetwork)
+        {
+          if(tempTarget==switchNetwork[j].switchId)
+          {
+            networkData = switchNetwork[j].NetworkName;
+
+       //   console.log(networkData);
+          }        
+              RouterNetworkInfo[temprouterId].networks.push(networkData);
+        } 
+      }
+    }
+   //firewall
+   if(tempSource[0]=="F")
+   {
+    //error
+    if(tempTarget[0]=="L"||tempTarget[0]=="S"||tempTarget[0]=="V")
+      { }
+   }
+}
+/********
+*******/
+
+console.log(RouterNetworkInfo);
+console.log(vmCluster);
+console.log(LBNetworkInfo);
+for(var index in vmCluster)
+{
+  var tempArr = uniqueArray(vmCluster[index].networks);
+  vmCluster[index].networks = tempArr;
+}
+for(var index in vmCluster)
+{
+   ClusterNetworkInfo[vmCluster[index].ClusterIndexID]=
+                    {
+                        "networks":vmCluster[index].networks,
+                    }     
+}
+console.log(ClusterNetworkInfo);
+for(var index in ClusterInfo)
+{
+  ClusterInfo[index].networks.length = 0;
+  for(var i in ClusterNetworkInfo[index].networks)
+  {
+    ClusterInfo[index].networks.push({"name":ClusterNetworkInfo[index].networks[i]});
+   }
+}
+console.log(ClusterInfo);
+for(var index in RouterNetworkInfo)
+{
+  var tempArr = uniqueArray(RouterNetworkInfo[index].networks);
+  RouterNetworkInfo[index].networks = tempArr;
+}
+for(var index in RouterNetworkInfo)
+{
+  RTInfo[index].networks.length = 0;
+  for(var i in RouterNetworkInfo[index].networks)
+  {
+    RTInfo[index].networks.push({"name":RouterNetworkInfo[index].networks[i]});
+   }
+}
+
+for(var index in LBNetworkInfo)
+{
+  var tempArr = uniqueArray(LBNetworkInfo[index].networks);
+  LBNetworkInfo[index].networks = tempArr;
+}
+for(var index in LBNetworkInfo)
+{
+  
+    LBInfo[index].network={"name":LBNetworkInfo[index].networks};
+    LBInfo[index].vip.network = {"name":LBNetworkInfo[index].networks};
+}
+
+
+}
+
+
+function serverToNetwork(servers,networks,ports,routers)
+{
+      serversInfo = servers;
+      networksInfo = networks;
+      portsInfo = ports;
+      routerInfo = routers;
+       /***虚拟机和网络连接关系***/
+      for(var index in serversInfo)
+      {
+        var server_network = [];
+
+        for (var i in portsInfo) 
+        {
+          if ((serversInfo[index].id == portsInfo[i].device_id) && portsInfo[i].device_owner == "compute:nova")
+          {
+            for (var j in networksInfo)
+            {
+              if(networksInfo[j].id == portsInfo[i].network_id)
+              {
+                server_network.push(networksInfo[j].id);
+              }
+            }
+          }
+        }
+        serversInfo[index].connectNetwork = server_network;
+        serversInfo[index].topoId = "VM"+index;    
+      }
+
+       /***网络和虚拟机连接关系***/
+      for(var index in networksInfo)
+      {
+        var network_server = [];
+        for (var i in serversInfo)
+        {
+          for(var j in serversInfo[i].connectNetwork)
+          {
+            if(serversInfo[i].connectNetwork[j]==networksInfo[index].id)
+            {
+               network_server.push(serversInfo[i].id);
+            }
+          }
+        }
+        networksInfo[index].connectServer = network_server;
+      }
+
+      /***路由器和网络连接关系***/
+      for(var index in networksInfo)
+      {
+        var network_router = [];
+        for(var i in portsInfo)
+        {
+          if((portsInfo[i].network_id == networksInfo[index].id)&&portsInfo[i].device_owner =="network:router_interface")
+          {
+            network_router.push(portsInfo[i].device_id);
+          }
+        }
+        networksInfo[index].connectRouter = network_router;
+      }
+
+      /***负载均衡器和网络连接关系***/
+      for(var index in networksInfo)
+      {
+        var network_loadBalancer = [];
+        for(var i in portsInfo)
+        {
+          if((portsInfo[i].network_id == networksInfo[index].id)&&portsInfo[i].device_owner =="neutron:LOADBALANCER")
+          {
+            network_loadBalancer.push(portsInfo[i].device_id);
+          }
+        }
+        networksInfo[index].connectLoadBalancer = network_loadBalancer;
+      }
+
+      /***路由器和外部网关连接关系***/
+      for(var index in networksInfo)
+      {
+        var extnetwork_router = [];
+        for(var i in portsInfo)
+        {
+          if((portsInfo[i].network_id == networksInfo[index].id))
+          {
+            var tempHeader = "gateway"+networksInfo[index].id;
+            if(tempHeader == portsInfo[i].id)
+            {
+              extnetwork_router.push(portsInfo[i].device_id);
+            }
+            
+          }
+        }
+        networksInfo[index].extConnectRouter = extnetwork_router;
+      }
+
+}
+
+
+function hostListCollection(sw_id,hostid)
+{
+  var dp_id;
+  var mac_id;
+  var port_id;
+  for(var index in switch_id)
+  {
+    if(switch_id[index].swid == sw_id)
+    {
+      dp_id = switch_id[index].dpid;
+    }
+  }
+  var temp = dp_id.substr(6);
+  var tempMac = temp.substring(0,16);
+  var macid = tempMac.concat(hostid);
+  var hostInfo = {
+          "dpid": dp_id,
+          "mac": macid,
+          "port": parseInt(hostid)
+  }
+  autoHostList.push(hostInfo);
+  console.log("host列表");
+  console.log(autoHostList);
+}
+
+function switchListCollection(sw_id)
+{
+  var dp_id;
+  for(var index in switch_id)
+  {
+     if(switch_id[index].swid == sw_id)
+    {
+      dp_id = switch_id[index].dpid;
+    }
+  }
+
+  autoSwitchList.push(dp_id);
+  console.log("switch列表");
+  console.log(autoSwitchList);
+}
+
+function switchVportsCollection(sw_id,vSw_id,port_id)
+{
+    var dp_id;
+    for(var index in switch_id)
+    {
+       if(switch_id[index].swid == sw_id)
+      {
+        dp_id = switch_id[index].dpid;
+      }
+    }
+    var s_v_p = {
+      "dpid":dp_id,
+      "vSid":vSw_id,
+      "port":port_id[4],
+    }
+    switch_vSwitch_ports.push(s_v_p);
+}
+function linkListing()
+{
+      
+	var connectionList = jsPlumb.getConnections();
+       var connections = [];
+              for (var index in connectionList)
+            {
+
+                connections.push(
+                  {
+                    "source":connectionList[index].sourceId,
+                    "target":connectionList[index].targetId,
+                    //"cidr": connectionList[index].getLabel()
+                  }
+                );
+            }
+       console.log(connections);
+	shc_connections = connections;
+
+}
+function update_shc(){
+        init_switch_host_cpu();	
+	for(var index in shc_connections)
+	  {
+	    if(shc_connections[index].target[0]=='V')
+               {
+		 for(var innerdex in switch_host_cpu)
+                   {
+			if(shc_connections[index].source == switch_host_cpu[innerdex].swid)
+				{
+				   switch_host_cpu[innerdex].hostCount++;
+				}
+                   }	
+               } 
+  	    
+	  }
+        for(var index in switch_host_cpu)
+	{
+	  var hostcount = switch_host_cpu[index].hostCount;
+	  switch_host_cpu[index].cpuUtil = 100 - hostcount*20;
+	}
+        console.log(switch_host_cpu);
+
+}
+
+
+function linkListCollection()
+{
+       var connectionList = jsPlumb.getConnections();
+       var connections = [];
+              for (var index in connectionList)
+            {
+                 
+                connections.push(
+                  {
+                    "source":connectionList[index].sourceId,
+                    "target":connectionList[index].targetId,
+                    //"cidr": connectionList[index].getLabel()
+                  }
+                );
+            }
+            for (var index in connections)
+            {
+              if(connections[index].source[0] =='v' && connections[index].target[0] == 'v')
+              {
+                for (var i in switch_vSwitch_ports)
+                {
+                  if (connections[index].source == switch_vSwitch_ports[i].vSid)
+                  {
+                    var srcPort = {
+                      "dpid" : switch_vSwitch_ports[i].dpid,
+                      "port" : parseInt(switch_vSwitch_ports[i].port),
+                    }
+                    for( var j in switch_vSwitch_ports)
+                    {
+                      if (connections[index].target == switch_vSwitch_ports[j].vSid)
+                      {
+                        var dstPort = {
+                          "dpid" : switch_vSwitch_ports[j].dpid,
+                          "port" : parseInt(switch_vSwitch_ports[j].port),
+                        }
+                      }
+                    }  
+                    var linkInfo = {
+                      "src" : srcPort,
+                      "dst" : dstPort
+                    }
+                    vSwitchLinks.push(linkInfo);
+                  }
+                }
+              }
+            }
+  console.log(connections);
+  console.log(switch_vSwitch_ports);
+  console.log(vSwitchLinks);
+}
+
+function manualSwitchListCollection(){
+	var temp_switch_list = [];
+    for(var index in switch_vSwitch_ports)
+	{
+		temp_switch_list.push(switch_vSwitch_ports[index].dpid);
+	}
+    var manual_switch_list = uniqueArray(temp_switch_list);
+	console.log("switch list");
+	console.log(manual_switch_list);
+	return manual_switch_list;
+
+}
+/**************
+*******jsPlumb initial block*******
+***************/
+
+jsPlumb.ready(function() 
+{
+
+	var Idx = {
+		'Instance':0,
+		'Connection':0,
+		'Name':0,
+	};
+
+jsPlumb.importDefaults(
+{
+Connector:"Flowchart",
+PaintStyle : 
+{
+lineWidth:3,
+strokeStyle: '#56ABE4'
+},
+DragOptions : { cursor: "crosshair" },
+ ConnectionsDetachable:false,
+});
+function params(self) 
+{
+		  return {
+		  parent: self,
+			endpoint: 'Blank',//Work around for connection deletion
+			deleteEndpointsOnDetach: true,
+			maxConnections:-1,
+			//uniqueEndpoint:true,
+			anchor: 'Continuous',
+		};
+	}
+  
+/***
+****************根据服务器端数据生成节点******************
+***/	
+/**
+  function networkTopoDisplay()
+  {
+    VmLink = serversInfo;
+    switchLink = networksInfo;
+    routerLink = networksInfo;
+    lbLink = networksInfo;
+    var swCount = 0;
+    var lbCount = 0;
+    var rtCount = 0;
+    var swNum = 0;
+    var rtNum = 0;
+    var lbNum = 0;
+
+    for(var index in VmLink)
+    {
+      VmLink[index].vmId = "VM"+index;
+    }
+    for(var index in switchLink)
+    {
+      if(switchLink[index]["router:external"] == false)
+       {        
+         switchLink[index].swId = "Switch"+swCount;
+         swCount++;
+      }
+
+    }
+    for(var index in lbLink)
+    {
+      
+      if(lbLink[index].connectLoadBalancer.length != 0)
+      {
+        lbLink[index].lbId = "LB"+lbCount;
+        lbCount++;
+      }
+    }
+    for (var index in routerInfo)
+    {
+      routerInfo[index].rtId = "Router"+index;
+    }
+    addFW("FW");
+    $("#FW0").css("left","100px");
+    $("#FW0").css("top","20px");
+    for(var index in VmLink)
+    {
+      addInstance("VM");
+      var Crelamove = index*100+200;
+      $('#'+VmLink[index].topoId).css("left", Crelamove);
+      $('#'+VmLink[index].topoId).css("top", "400px");
+    }
+    for(var index in switchLink)
+    {
+      if(switchLink[index].swId)
+      {        
+        addSwitch("Switch");
+        var Srelamove = swNum*100+200;
+        $('#'+switchLink[index].swId).css("left", Srelamove);
+        $('#'+switchLink[index].swId).css("top", "280px");
+          swNum++;
+      }
+    }
+    for(var index in lbLink)
+    {
+      if(lbLink[index].lbId)
+      {
+        addLB("LB");
+         var relativeMove = (lbNum-1)*100+200;
+         $('#'+lbLink[index].lbId).css("left", relativeMove);
+         $('#'+lbLink[index].lbId).css("top", "180px");
+      }
+    }
+        for(var index in routerInfo)
+    {
+        addRouter("Router");
+        var rtmove = rtNum*100+200;
+        $('#'+routerInfo[index].rtId).css("left",rtmove);
+        $('#'+routerInfo[index].rtId).css("top","100px");
+        rtNum++;
+    }
+
+
+
+    console.log(VmLink);
+    console.log(switchLink);
+    console.log(lbLink);
+    console.log(routerLink);
+  }
+
+ function topoLink()
+  {
+    console.log(routerInfo);
+    var lineColor = ["#56ABE4","blue","green","purple","grey","yellow","red"]
+    for (var index in routerInfo)
+    {
+ 
+        jsPlumb.connect({source:"FW0",target:routerInfo[index].rtId,paintStyle:{lineWidth:3,strokeStyle:lineColor[0]}});
+    
+    }
+
+    for(var index in switchLink)
+    {
+      if(switchLink[index].swId)
+      {
+        if(switchLink[index].lbId)
+        {
+        jsPlumb.connect({source:switchLink[index].lbId,
+                                            target:switchLink[index].swId,
+                                            paintStyle:{lineWidth:3,strokeStyle:lineColor[0]}});
+        if(switchLink[index].connectRouter.length> 0 )
+        {
+          for (var cR in switchLink[index].connectRouter)
+          {
+                    for(var x in routerInfo)
+                {
+                       if(routerInfo[x].id == switchLink[index].connectRouter[cR])
+                       {
+                                     jsPlumb.connect({
+                                        source:routerInfo[x].rtId,
+                                        target:switchLink[index].swId,paintStyle:{lineWidth:3,strokeStyle:lineColor[0]}});
+                       }
+                 }
+        }
+        }
+        }
+        else if(switchLink[index].connectRouter.length> 0 )
+        {
+          for (var cR in switchLink[index].connectRouter)
+          {
+                    for(var x in routerInfo)
+                {
+                       if(routerInfo[x].id == switchLink[index].connectRouter[cR])
+                       {
+                                     jsPlumb.connect({
+                                        source:routerInfo[x].rtId,
+                                        target:switchLink[index].swId,paintStyle:{lineWidth:3,strokeStyle:lineColor[0]}});
+                       }
+                 }
+        }
+        }
+        if(switchLink[index].connectServer.length!= 0)
+        {
+        //  console.log(switchLink[index].connectServer);
+          for(var i in switchLink[index].connectServer)
+          {
+            for(var j in VmLink)
+            {
+              if(switchLink[index].connectServer[i]==VmLink[j].id)
+              {
+                jsPlumb.connect({source:switchLink[index].swId,target:VmLink[j].topoId,paintStyle:{lineWidth:3,strokeStyle:lineColor[0]}});
+              }
+            }
+          }
+        }
+      }
+    }
+
+  }
+
+**/
+        function addInstance(str_name,str_id,sw_id)
+        {
+		if(!Idx[str_name] || Idx[str_name] < 0)
+		{
+			Idx[str_name] = 0;
+		}
+
+                var newItem = $('<div>').attr('id', str_name + Idx[str_name]).addClass(str_name);
+                 var title = $('<div>').addClass('title').text(str_id);
+                 var img = $('<img/>');
+                var insId = str_name + Idx[str_name];      
+                  img.attr({"src":"static/mysite/instance.svg","width":"50px","height":"50px"});     
+                 img.appendTo(newItem);       
+        
+			newItem.append(title);
+			$("#mininet-container").append(newItem);
+                        $('#'+insId).css("left", x_loc);
+                        $('#'+insId).css("top", y_loc-150);
+                        jsPlumb.connect({source:sw_id,
+                     target:newItem,
+                     endpoint:[ "Dot", { radius:2} ],
+                     anchor:"AutoDefault"});	
+			jsPlumb.draggable(newItem, {
+			  	containment: 'parent'
+			});
+			Idx[str_name]++;    
+	}
+		
+		
+	function addSwitch(str_name,str_id)
+	{
+		if(!Idx[str_name] || Idx[str_name] < 0)
+		{
+			Idx[str_name] = 0;
+		}
+
+		var newSwitch = $('<div>').attr('id', str_name + Idx[str_name]).addClass(str_name);
+		var title = $('<div>').addClass('title').text( str_name + Idx[str_name]);
+    		        var img = $('<img/>');
+                      var tempswitch_id = {
+                        "swid":str_name + Idx[str_name],
+                        "dpid":str_id
+                      }
+                      img.attr({"src":"static/mysite/switch.svg","width":"50px","height":"50px"});       
+                      img.appendTo(newSwitch);  
+                			newSwitch.append(title);
+                			$("#mininet-container").append(newSwitch);
+                			jsPlumb.makeTarget(newSwitch, params(newSwitch));
+                			jsPlumb.makeSource(title, params(newSwitch));     
+                			jsPlumb.draggable(newSwitch, {
+                			  	containment: 'parent'
+                			});
+
+                			Idx[str_name]++;   
+                      return tempswitch_id; 
+	}
+
+        function addRouter(str_name,sw_id,port_id)
+        {
+                if(!Idx[str_name] || Idx[str_name] < 0)
+                {
+                  Idx[str_name] = 0;
+                }
+
+                var newRouter = $('<div>').attr('id', str_name + Idx[str_name]).addClass(str_name);
+                var vs_id = str_name + Idx[str_name];
+                var title = $('<div>').addClass('title').text(port_id);
+                var img = $('<img/>');      
+                   img.attr({"src":"static/mysite/router.svg" ,"width":"30px","height":"30px"});   
+                   img.appendTo(newRouter);    
+                newRouter.append(title);
+                $("#mininet-container").append(newRouter);
+                $('#'+vs_id).css("left", x_loc);
+                $('#'+vs_id).css("top", y_loc-150);
+                jsPlumb.connect({source:sw_id,
+                     target:newRouter,
+                     Connector:"Bezier",
+                     endpoint:[ "Dot", { radius:2} ],
+                     PaintStyle : {lineWidth:3,strokeStyle: '#11CD6E'},
+                     anchor:"AutoDefault"});  
+                jsPlumb.makeTarget(newRouter, params(newRouter));
+                jsPlumb.makeSource(title, params(newRouter));     
+                jsPlumb.draggable(newRouter, {
+                    containment: 'parent'
+                });
+
+                Idx[str_name]++;    
+                return vs_id;
+        }
+/**********
+交换机网络信息收集
+***********/
+$("#NetworkInfoCollection").click(function(){
+     var json_networkname = document.getElementById("networksName");
+     var json_networkcidr = document.getElementById("subnetIp");
+      if(SWID){
+        var Networkindex= parseInt(SWID[6]);
+        NETInfo[Networkindex]={
+          "name" : json_networkname.value,
+          "cidr" : json_networkcidr.value
+        }
+        switchNetwork[Networkindex] = 
+        {
+                "switchId":SWID,
+                "NetworkName":json_networkname.value                  
+        }
+         var jsonData = JSON.stringify(NETInfo[Networkindex]);
+        
+        console.log(jsonData);      
+         }
+else{
+        NETInfo[0]={
+          "name" : json_networkname.value,
+          "cidr" : json_networkcidr.value
+        }
+         switchNetwork[0] = 
+        {
+                "switchId":"Switch0",
+                "NetworkName":json_networkname.value                  
+        }
+ var jsonData = JSON.stringify(NETInfo[Networkindex]);
+        console.log(jsonData);     
+}    
+
+});
+
+$(document).mousemove(function(e)
+      {
+         x_loc = e.pageX;
+         y_loc = e.pageY;
+      //  console.log("x:"+x_loc+'<br>'+"y:"+y_loc);
+      });
+
+$(".refreshCpu").click(function()
+{
+	console.log("click");
+
+}
+);
+
+/***
+***交换机右键菜单***
+***/
+
+$(function(){
+    $('#mininet-container').contextMenu({
+        selector: '.Switch', 
+        items: {
+            "fold1a-key1": {name: "host-port1", icon: "edit",callback:function()
+            {
+              SWID=$(this).attr("id"); 
+              addInstance("VM","host1",SWID);
+	      linkListing();
+	      update_shc();
+              hostListCollection(SWID,"1");
+              switchListCollection(SWID);
+
+            }},
+            "fold1a-key2": {name: "host-port2", icon: "edit",callback:function()
+            {
+              SWID=$(this).attr("id"); 
+              addInstance("VM","host2",SWID);
+		linkListing();
+		update_shc();
+              hostListCollection(SWID,"2");
+              switchListCollection(SWID);
+            }},
+            "fold1a-key3": {name: "host-port3", icon: "edit",callback:function()
+            {
+              SWID=$(this).attr("id"); 
+              addInstance("VM","host3",SWID);
+		linkListing();
+		update_shc();
+              hostListCollection(SWID,"3");
+              switchListCollection(SWID);
+            }},
+            "fold1a-key4": {name: "host-port4", icon: "edit",callback:function()
+            {
+              SWID=$(this).attr("id"); 
+              addInstance("VM","host4",SWID);
+		linkListing();
+		update_shc();
+              hostListCollection(SWID,"4");
+              switchListCollection(SWID);
+            }},
+            "fold1a-key5": {name: "switch-port5", icon: "edit",callback:function()
+            {
+              SWID=$(this).attr("id");
+              var vsid = addRouter("vSwitch",SWID,"port5");
+              switchVportsCollection(SWID,vsid,"port5");
+            }},
+            "fold1a-key6": {name: "switch-port6", icon: "edit",callback:function()
+            {
+              SWID=$(this).attr("id");
+              var vsid = addRouter("vSwitch",SWID,"port6");
+                switchVportsCollection(SWID,vsid,"port6");
+            }},
+            "fold1a-key7": {name: "switch-port7", icon: "edit",callback:function()
+            {
+              SWID=$(this).attr("id");
+              var vsid = addRouter("vSwitch",SWID,"port7");
+                switchVportsCollection(SWID,vsid,"port7");
+            }},
+            "sep1": "---------",
+            "quit": {name: "Quit", icon: "quit",callback: $.noop}
+        } 
+    });
+
+
+
+});
+
+/***
+***虚拟机右键菜单***
+***/
+$(function(){
+    $('#mininet-container').contextMenu({
+        selector: '.VM', 
+        items: {
+            "edit": {name: "Edit", icon: "edit",callback:function()
+            {
+              VMID=$(this).attr("id");
+              $('#myModal').modal({keyboard: true});
+            }},
+
+            "delete": {name: "Delete", icon: "delete",callback: function()
+            {
+             VMID=$(this).attr("id");
+              jsPlumb.detachAllConnections($('#'+VMID));
+             $('#'+VMID).remove();
+             Idx['VM']--;
+            }},
+            "sep1": "---------",
+            "quit": {name: "Quit", icon: "quit",callback: $.noop}
+        } 
+    });
+});
+
+
+
+function getNetworkInfo(swIds)
+{
+    var switchId;
+    var cpu_util;
+    var spc_index;
+    for(var index in switch_id)
+    {
+         if(switch_id[index].swid == swIds)
+         {
+            switchId = switch_id[index].dpid;
+         }
+    }
+    for(spc_index=0 ;spc_index <= 10; spc_index++)
+	{
+		if(swIds == switch_host_cpu[spc_index].swid){
+
+		   cpu_util = switch_host_cpu[spc_index].cpuUtil;
+		   break;
+                  }	
+	}
+//    console.log(spc_index);
+//    console.log(switch_host_cpu[spc_index].cpuUtil);
+     return "交换机ID: "+switchId+"<br>"+"名称: "+swIds;
+}
+
+
+
+        $("#clean").click(function() {
+            cleanTopo();          
+        });
+
+      function cleanTopo()
+      {
+        ClusterCounter = 0;
+         $('.VM').each(function(){
+            jsPlumb.detachAllConnections($(this));
+            $(this).remove();
+         })
+
+         Idx['VM']=-1;
+         $('.Switch').each(function(){
+            jsPlumb.detachAllConnections($(this));
+            $(this).remove();
+         })
+         Idx['Switch']=-1;
+          
+        $('.vSwitch').each(function(){
+            jsPlumb.detachAllConnections($(this));
+            $(this).remove();
+         })
+         Idx['vSwitch']=-1;
+        autoHostList.length = 0;
+        autoSwitchList.length = 0;
+        switch_vSwitch_ports.length = 0;
+        vSwitchLinks.length = 0;
+	switch_id.length = 0;
+      }
+
+
+
+		//Connection Listener
+		//Deal with multiple connections between two Endpoints
+$("#initPhysical").click(function()
+{
+   cleanTopo();  
+  var remotePhysical = getData();
+  physicalTopo = JSON.parse(remotePhysical);
+  console.log(physicalTopo);
+
+  for(var index in physicalTopo.switches)
+  {
+    switch_id.push(addSwitch("Switch",physicalTopo.switches[index]));
+
+  }
+  
+    $("#Switch1").css("top","80px");
+    $("#Switch2").css("top","80px");
+    $("#Switch5").css("top","80px");
+    $("#Switch7").css("top","80px");
+    $("#Switch8").css("top","80px");
+
+    $("#Switch4").css("top","380px");
+    $("#Switch9").css("top","380px");
+    $("#Switch0").css("top","380px");
+    $("#Switch6").css("top","380px");
+    $("#Switch3").css("top","380px");
+
+    $("#Switch10").css("top","200px");
+
+    $("#Switch8").css("left","40px");
+    $("#Switch1").css("left","200px");
+    $("#Switch2").css("left","360px");
+    $("#Switch5").css("left","520px");
+    $("#Switch7").css("left","680px");
+
+    $("#Switch4").css("left","40px");
+    $("#Switch9").css("left","200px");
+    $("#Switch0").css("left","360px");
+    $("#Switch6").css("left","520px");
+    $("#Switch3").css("left","680px");
+
+    $("#Switch10").css("left","950px");
+
+  
+  console.log(switch_id);
+  
+  
+  for(var index in physicalTopo.links)
+  {
+    for(var i in switch_id)
+    {
+      if(physicalTopo.links[index].dst.dpid == switch_id[i].dpid)
+        {
+          physicalTopo.links[index].dst.swid = switch_id[i].swid;
+        }
+    }
+    for(var i in switch_id)
+    {
+      if(physicalTopo.links[index].src.dpid == switch_id[i].dpid)
+        {
+          physicalTopo.links[index].src.swid = switch_id[i].swid;
+        }
+    }
+  }
+
+  console.log(physicalTopo);
+
+  for(var index in physicalTopo.links)
+  { 
+    var linkLabel = physicalTopo.links[index].linkId;
+    phyLink[index] = jsPlumb.connect({source:physicalTopo.links[index].src.swid,
+                     target:physicalTopo.links[index].dst.swid
+   /** overlays:[
+       [ "Label", {label:"100M", id:"label"+index}]
+             ]
+		**/
+                     });
+  }
+ init_switch_host_cpu();
+
+   $(".Switch").each(function(){
+              
+              SWID=$(this).attr("id");
+              $('#'+SWID).popover(
+          {
+            trigger:'click',
+            template:'<div class="popover" role="tooltip"><div class="arrow"></div><h3 class="popover-title">name</h3><div class="popover-content">setting</div>',
+            html: true,
+            title:"交换机信息",
+            content: getNetworkInfo(SWID),
+     });
+});
+
+});
+
+$("#removeVirtual").click(function(){
+  var removeTopo = {
+    "id": "1",
+    "jsonrpc": "2.0",
+    "method": "removeNetwork",
+    "params": {
+        "network": {
+            "tenantId":1
+        }
+    }
+   }
+ var json_removeVirtual = JSON.stringify(removeTopo);
+ console.log(json_removeVirtual);
+ var removeData = postData(json_removeVirtual,"removeVirtualTopo");
+ console.log(removeData);
+});
+
+$("#getVirtual").click(function(){
+  var getTopo = {
+    "id": "1",
+    "jsonrpc": "2.0",
+    "method": "getVirtualTopology",
+    "params": {
+        "network": {
+            "tenantId":1
+        }
+    }
+   }
+ var json_getVirtual = JSON.stringify(getTopo);
+ console.log(json_getVirtual);
+ var getResult = postData(json_getVirtual,"getVirtualTopo");
+ console.log(getResult);
+});
+
+$("#autoVirtual").click(function(){
+  var physicalClone = {
+    "id": "1",
+    "jsonrpc": "2.0",
+    "method": "createNetwork",
+    "params": {
+        "network": {
+            "controller": {
+                "ctrls": [
+                    "tcp:localhost:6634"
+                ],
+                "type": "custom"
+            },
+            "hosts": autoHostList,
+            "switches":autoSwitchList,
+            "routing": {
+                "algorithm": "spf",
+                "backup_num": 1
+            },
+            "subnet": "192.168.0.0/24",
+            "type": "custom_auto"
+        }
+    }
+  }
+  var json_autoVirtual = JSON.stringify(physicalClone);
+  console.log(json_autoVirtual);
+  autoHostList.length = 0;
+  autoSwitchList.length = 0;
+});
+
+$("#manualVirtual").click(function(){
+
+  linkListCollection();
+  var manualSwitchList = manualSwitchListCollection();
+  var physicalmanual = {
+    "id": "1",
+    "jsonrpc": "2.0",
+    "method": "createNetwork",
+    "params": {
+        "network": {
+            "controller": {
+                "ctrls": [
+                    "tcp:localhost:6634"
+                ],
+                "type": "custom"
+            },
+            "copy-dpid": false,
+            "hosts": autoHostList,
+            "switches": manualSwitchList,
+            "links": vSwitchLinks,
+            "routing": {
+                "algorithm": "spf",
+                "backup_num": 1
+            },
+            "subnet": "192.168.0.0/24",
+            "type": "custom_manual"
+        }
+    }
+  }
+  var json_manualVirtual = JSON.stringify(physicalmanual);
+  console.log(json_manualVirtual);
+
+  var temTest = {
+    "id": "1",
+    "jsonrpc": "2.0",
+    "method": "createNetwork",
+    "params": {
+        "network": {
+            "controller": {
+                "ctrls": [
+                    "tcp:localhost:6634"
+                ],
+                "type": "custom"
+            },
+            "copy-dpid": false,
+            "hosts": [
+                {
+                    "dpid": "00:00:00:00:00:00:01:00",
+                    "mac": "00:00:00:00:01:01",
+                    "port": 1
+                },
+                {
+                    "dpid": "00:00:00:00:00:00:04:00",
+                    "mac": "00:00:00:00:04:02",
+                    "port": 2
+                },
+                {
+                    "dpid": "00:00:00:00:00:00:08:00",
+                    "mac": "00:00:00:00:08:03",
+                    "port": 3
+                }
+            ],
+            "switches": [
+                    "00:00:00:00:00:00:01:00",
+                    "00:00:00:00:00:00:04:00",        
+                    "00:00:00:00:00:00:07:00",
+                    "00:00:00:00:00:00:08:00",
+                    "00:00:00:00:00:00:09:00"
+            ],
+            "links":[                                 
+                {"src":{"dpid":"00:00:00:00:00:00:01:00",
+                        "port":6
+                       },
+                 "dst":{"dpid":"00:00:00:00:00:00:07:00",
+                        "port":5
+                       }
+                },
+                {"src":{"dpid":"00:00:00:00:00:00:07:00",
+                        "port":7
+                       },
+                 "dst":{"dpid":"00:00:00:00:00:00:08:00",
+                        "port":5
+                       }
+                },
+                {"src":{"dpid":"00:00:00:00:00:00:08:00",
+                        "port":7
+                       },
+                 "dst":{"dpid":"00:00:00:00:00:00:09:00",
+                        "port":5
+                       }
+                },
+                {"src":{"dpid":"00:00:00:00:00:00:09:00",
+                        "port":6
+                       },
+                 "dst":{"dpid":"00:00:00:00:00:00:04:00",
+                        "port":6
+                       }
+                },
+
+            ],
+            "routing": {
+                "algorithm": "spf",
+                "backup_num": 1
+            },
+            "subnet": "192.168.0.0/24",
+            "type": "custom"
+        }
+    }
+}
+
+//  var tem = JSON.stringify(temTest);
+//  console.log(tem);
+//  var rete = postData(tem,"manualVirtualTopo");
+  var res = postData(json_manualVirtual,"manualVirtualTopo");
+  console.log(res);
+ // console.log(rete);
+ // autoHostList.length = 0;
+ // autoSwitchList.length = 0;
+  vSwitchLinks.length = 0;
+
+});
+$("#selectLinks").click(function(){
+     var testCase = {
+    "id": "1",
+    "jsonrpc": "2.0",
+    "method": "createNetwork",
+    "params": {
+        "network": {
+            "hosts": [
+                {
+                    "dpid":"00:a4:23:05:00:00:00:01",
+                    "mac": "00:00:00:00:02:01",
+                    "port": 1
+                },
+                {
+                    "dpid": "00:a4:23:05:00:00:00:03",
+                    "mac": "00:00:00:00:0b:02",
+                    "port": 2
+                }
+            ],
+            "switches":[                                 
+                {
+			"dpid": "00:a4:23:05:00:00:00:01",
+			"in_port":1,
+			"out_port":2
+		
+                },
+		{
+			"dpid":"00:a4:23:05:00:00:00:02",
+			"in_port":1,
+			"out_port":2
+                },
+		{
+			"dpid":"00:a4:23:05:00:00:00:03",
+			"in_port":2,
+			"out_port":1
+                }
+            ]
+        }
+    }
+}
+    var test = JSON.stringify(testCase)
+    alert(test);
+    var selectLinkResult = postData(test,"getVirtualLinks");
+    console.log(selectLinkResult);
+
+});
+$("#check_cpu_status").click(function()
+{
+    $("#cpu_band_table").animate({height:'toggle',opacity:'0.9'});
+    $("#s_c_0").html(switch_host_cpu[0].cpuUtil+"%");
+    $("#s_c_1").html(switch_host_cpu[1].cpuUtil+"%");
+    $("#s_c_2").html(switch_host_cpu[2].cpuUtil+"%");
+    $("#s_c_3").html(switch_host_cpu[3].cpuUtil+"%");
+    $("#s_c_4").html(switch_host_cpu[4].cpuUtil+"%");
+    $("#s_c_5").html(switch_host_cpu[5].cpuUtil+"%");
+    $("#s_c_6").html(switch_host_cpu[6].cpuUtil+"%");
+    $("#s_c_7").html(switch_host_cpu[7].cpuUtil+"%");
+    $("#s_c_8").html(switch_host_cpu[8].cpuUtil+"%");
+    $("#s_c_9").html(switch_host_cpu[9].cpuUtil+"%");
+    $("#s_c_10").html(switch_host_cpu[10].cpuUtil+"%");
+});
+
+$("#check_bandwidth_status").click(function()
+{
+//	console.log(phyLink);
+	var label1 = phyLink[1].getOverlay("label1");
+	label1.setLabel("90M");
+        var label2 = phyLink[2].getOverlay("label2");
+        label2.setLabel("80M");
+        var label3 = phyLink[4].getOverlay("label4");
+        label3.setLabel("90M");
+        var label4 = phyLink[12].getOverlay("label12");
+        label4.setLabel("80M");
+	var label5 = phyLink[17].getOverlay("label17");
+        label5.setLabel("80M");
+	var label6 = phyLink[20].getOverlay("label20");
+        label6.setLabel("90M");
+}); 
+     jsPlumb.bind('connection',function(info){
+		 var connsList = jsPlumb.getConnections();
+		   	var connection = info.connection;
+			var arr1 = jsPlumb.select({source:connection.sourceId,target:connection.targetId});
+			var arr2 = jsPlumb.select({source:connection.targetId,target:connection.sourceId});
+			var endpoints = connection.endpoints;
+			if(arr1.length + arr2.length>1){
+				jsPlumb.detach(connection);
+				return ;
+			}
+		      	var connectionIdx = Idx['Connection'];
+		       	var cidr = "100M";
+	//		console.log(connection);
+	//		connection.setLabel(cidr);
+			Idx['Connection']++;
+		});		
+	});

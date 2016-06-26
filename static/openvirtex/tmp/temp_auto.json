@@ -1,0 +1,1 @@
+{"params": {"network": {"subnet": "192.168.0.0/24", "links": [], "switches": [], "controller": {"type": "custom", "ctrls": ["tcp:10.108.125.20:6633"]}, "hosts": [], "routing": {"backup_num": 1, "algorithm": "spf"}, "type": "custom_auto"}}, "jsonrpc": "2.0", "id": "1", "method": "createNetwork"}

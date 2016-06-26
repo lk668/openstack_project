@@ -1,0 +1,11 @@
+# SSH登录用户名称
+username: root
+# SSH登录用户密码
+passwd: '82325588'
+# SSH需要登录的IP地址列表
+ips:
+- 10.108.125.234
+- 10.108.126.3
+- 10.108.126.4
+# SSH登录后需要执行的命令
+execs: ovs-ofctl show br-int

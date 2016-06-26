@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% load url from future %}
+{% block title %}{% trans "Tenant Virtual Network" %}{% endblock %}
+
+{% block page_header %}
+  {% include "horizon/common/_page_header.html" with title=_("openvirtex") %} 
+{% endblock page_header %}
+
+{% load staticfiles %}
+
+
+{% block main %}
+<noscript>
+{% trans "This pane needs javascript support." %}
+</noscript>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>OpenVirtex</title>
+      <link rel="stylesheet" type="text/css" href="{% static 'openvirtex/bootstrap.min.css' %}">
+      <link rel="stylesheet" type="text/css" href="{% static 'openvirtex/openVirtex.css' %}">
+      <link rel="stylesheet" type="text/css" href="{% static 'openvirtex/jquery.contextMenu.css' %}" />
+      <link rel="stylesheet" type="text/css" href="{% static 'openvirtex/screen.css' %}"/>
+      <link rel="stylesheet" type="text/css" href="{% static 'openvirtex/prettify.sunburst.css' %}"/>
+
+      <script src="http://cdn.bootcss.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="http://cdn.bootcss.com/respond.js/1.4.2/respond.min.js"></script>
+      <script src="http://cdn.bootcss.com/jquery/1.11.1/jquery.min.js"></script>
+      
+      <script type="text/javascript" src="{% static 'openvirtex/html5shiv.min.js' %}"></script>
+      <script type="text/javascript" src="{% static 'openvirtex/respond.min.js' %}"></script>
+      <script type="text/javascript" src="{% static 'openvirtex/jquery.min.js' %}"></script>
+      <script type="text/javascript" src="{% static 'openvirtex/bootstrap.min.js' %}"></script>
+      <script type="text/javascript" src="{% static 'openvirtex/jquery.jsPlumb-1.6.4.js' %}"></script>
+      <script type="text/javascript" src="{% static 'openvirtex/jquery-ui.min.js' %}"></script>
+      <script type="text/javascript" src="{% static 'openvirtex/prettify.js' %}"></script>
+      <script type="text/javascript" src="{% static 'openvirtex/jquery.ui.position.js' %}"></script>
+      <script type="text/javascript" src="{% static 'openvirtex/jquery.contextMenu.js' %}"></script>
+      <script type="text/javascript" src="{% static 'openvirtex/screen.js' %}"></script>
+
+      <script type="text/javascript" src="{% static 'openvirtex/openvirtex_v1.js' %}"></script>
+<!--body background="{% static 'openvirtex/background.jpg' %}"-->
+	<div id="mainbody">
+	<!-- 导航栏操作菜单 -->
+		<nav class="navbar navbar-default" role="navigation">
+		    <div class="container-fluid">
+
+		    <div class="navbar-header">
+		      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+		        <span class="sr-only">Toggle navigation</span>
+		        <span class="icon-bar"></span>
+		        <span class="icon-bar"></span>
+		        <span class="icon-bar"></span>
+		      </button>
+		    </div>
+		    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+		      <ul class="nav navbar-nav">
+		        <li id="initPhysical"><a href="#">初始化物理拓扑</a></li>
+		        <li id="autoVirtual"><a href="#">自动配置虚拟网络</a><li>
+		        <li id="manualVirtual"><a href="#">手动配置虚拟网络</a></li>
+            <li id="removeVirtual"><a href="#">删除虚拟网络</a></li>
+            <li id="getVirtual"><a href="http://10.108.125.20:9000/virtual" target="_blank">获取当前虚拟网络</a></li>
+      			<li id="check_cpu_status"><a href="#">查看CPU剩余率</a></li> 
+            <li id="check_bandwidth_status"><a href="#">查看带宽</a></li>
+            <li id="selectLinks"><a href="#">选路</a></li>
+		        <li id="clean"><a href="#">清空</a><li>
+		      </ul>
+		    </div><!-- /.navbar-collapse -->
+		  </div><!-- /.container-fluid -->
+		</nav>
+
+		<div id="mininet-container">
+
+                <div id="cpu_band_table">
+                 <table class="table">
+   			<caption>cpu—util</caption>
+  			 <thead>
+			 <tr>
+       			  <th>交换机</th>
+    			 <th>CPU剩余率</th>
+    			  </tr>
+   			</thead>
+   			<tbody>
+      			<tr>
+         		<td>Switch0</td>
+         		<td id = "s_c_0"></td>
+      			</tr>
+     			 <tr>
+         		<td>Switch1</td>
+         		<td id = "s_c_1"></td>
+      			</tr>
+			<tr>
+                        <td>Switch2</td>
+                        <td id = "s_c_2"></td>
+                        </tr>
+			<tr>
+                        <td>Switch3</td>
+                        <td id = "s_c_3"></td>
+                        </tr>
+			<tr>
+                        <td>Switch4</td>
+                        <td id = "s_c_4"></td>
+                        </tr>
+			<tr>
+                        <td>Switch5</td>
+                        <td id= "s_c_5"></td>
+                        </tr>
+ 		 	<tr>
+                        <td>Switch6</td>
+                        <td id = "s_c_6"></td>
+                        </tr>
+			<tr>
+                        <td>Switch7</td>
+                        <td id = "s_c_7"></td>
+                        </tr>
+			<tr>
+                        <td>Switch8</td>
+                        <td id = "s_c_8"></td>
+                        </tr>
+			<tr>
+                        <td>Switch9</td>
+                        <td id = "s_c_9"></td>
+                        </tr>
+			<tr>
+                        <td>Switch10</td>
+                        <td id = "s_c_10"></td>
+                        </tr>
+   			</tbody>
+ 		</table>
+
+
+
+                </div>
+		</div>
+	</div>
+
+<!--/body-->
+
+
+ {% endblock %}
