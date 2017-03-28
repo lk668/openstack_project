@@ -227,10 +227,11 @@ def physicaljson(request): #get physicalTopo json data
             serversInfo = get_servers(request)  # list
             portsInfo = get_neutron_ports(request)      #list
             ovsPortsInfo = get_ovsPorts()       #list
+            vlan_ids = get_vlan_id()            #dict
         except Exception,e:
             response = {"_type":"Error","_message":traceback.format_exc()}
             return HttpResponse(json.dumps(response)) 
-        for ovs_port in  ovsPortsInfo:
+        for ovs_port in ovsPortsInfo:
             for switch in topoInfo["switches"]:
                 if ovs_port["ip"] == switch["ip"]:
                     ovs_port["dpid"] = switch["dpid"]
@@ -250,12 +251,16 @@ def physicaljson(request): #get physicalTopo json data
                     break
             for bridge in ovsPortsInfo:
                 for port in bridge["ports"]:
-                    a = re.search(r"\(.+\)",port).group()[4:-1]
-                    if a == port_id[:11]:
+                    a = re.search(r"\(.+\)",port).group()
+                    if a[4:-1] == port_id[:11]:
                         dpid = bridge['dpid']
                         port_num = int(re.search(r"\d+",port).group())
+                        if vlan_ids.has_key(a[1:-1]):
+                            vlan_id = vlan_ids[a[1:-1]]
+                        else:
+                            vlan_id = 'null'
                         break
-            topoInfo["hosts"].append({"dpid":dpid,"mac":mac,"port":port_num,"relname":relname,"ip":ip})
+            topoInfo["hosts"].append({"dpid":dpid,"mac":mac,"port":port_num,"relname":relname,"ip":ip, "vlan":vlan_id})
         topoInfo["_type"] = "Success"
         topoInfo["_message"] = "Init physical topology success"
         return HttpResponse(json.dumps(topoInfo))
@@ -308,6 +313,25 @@ def get_ovsPorts():
             a = {'ip':ip,'ports':s}
             ovs_ports.append(a)
     return ovs_ports
+
+def get_vlan_id():
+    vlan_ids = {}
+    f = open(os.getcwd()+"/static/openvirtex/config/config.yml")
+    config = yaml.load(f)
+    cmd = 'ovs-vsctl show'
+    username = config['username']
+    passwd = config['passwd']
+    ips = config['ips']
+    for ip in ips:
+        rel = ssh.ssh_save_exec(ip, username, passwd, cmd)
+        if rel is not "Error":
+            for i in range(len(rel)):
+                line1 = rel[i].strip()
+                if line1.startswith('Port'):
+                    line2 = rel[i + 1].strip()
+                    if line2.startswith('tag'):
+                        vlan_ids[str(line1[5:])] = str(line2[5:])
+    return vlan_ids
 
 def get_Bytes(rel,in_port):
     byte = 0

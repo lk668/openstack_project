@@ -725,7 +725,8 @@ function d3_hostListCollection(manualTopo)
         var host_info = {
           "mac":physicalTopo.hosts[i].mac,
           "dpid":physicalTopo.hosts[i].dpid,
-          "port":physicalTopo.hosts[i].port
+          "port":physicalTopo.hosts[i].port,
+          "vlan_id":physicalTopo.hosts[i].vlan_id
         }
         tmp_host.push(host_info);
       }
