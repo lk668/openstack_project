@@ -303,6 +303,12 @@ def test_band(virtual_topo_band,command_shell):
             time.sleep(10)
     return band_links
 
+def get_addr_mapping(gopts, opts, args):
+    req = {"tenantId": int(args[0])}
+    date = ovxctl.connect(gopts, "status", "getVirtualAddressMapping", data=req,
+                                     passwd=ovxctl.getPasswd(gopts))  # 数据为json格式
+    return data
+
 def get_Bytes(rel,in_port,dpid):
     req = json.loads(rel[0])
     flow_virtual = req[str(dpid)]
