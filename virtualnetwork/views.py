@@ -93,6 +93,22 @@ def selectVirtualLinks(request): #get virtual NetworkLinks
             response = {"_type":"Warning","_message":"The tenant or the user doesn't have a SDN virtual network."}
         else:
             try:
+                ovx_id = ovx_virtual['ovx_id']
+                command = ['-n', 'getVirtualAddressMapping', str(ovx_id)]
+                (gopts, rargs, parser) = ovxctl.parse_global_args(command[0:])
+                (parse_args, do_func) = ovxctl.CMDS[rargs[0]]
+                (opts, args) = parse_args(rargs[1:], rargs[0])
+                res = get_addr_mapping(gopts, opts, args)
+
+                params = manualLink.get("params")
+                network = params.get("network")
+                req_hosts = network.get("hosts")
+
+                phy_topo = json.loads(ovx_virtual['physical_topo'])
+                phy_hosts = phy_topo["params"]["network"]["hosts"]
+
+                for host in req_hosts:
+                    pass
                 ip = ovx_virtual['controller_ip']
                 rpc = RPC(ip)
                 response = rpc.request(request.body)
